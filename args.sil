@@ -1,0 +1,8 @@
+-- Number of args for each primitive.
+open = 1
+command = 1
+global = 3 -- LAMMPS -> String -> a:* -> a
+get_natoms = 1
+extract_atom = 3
+extract_compute = 4
+gather_atoms = 4
