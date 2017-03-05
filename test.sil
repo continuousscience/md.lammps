@@ -1,1 +1,1 @@
-ok = Quote test_prim(lammps)
+ok = lazy test_prim(lammps)

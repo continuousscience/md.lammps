@@ -6,3 +6,9 @@ get_natoms = 1
 extract_atom = 3
 extract_compute = 4
 gather_atoms = 4
+
+molecule = 1
+read_data = 1
+newDatum = 1
+getDatum = 1
+putDatum = 2

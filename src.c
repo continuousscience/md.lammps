@@ -1,13 +1,5 @@
-#define lmp_str_st \
-    size_t len; \
-    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len); \
-    if(lmp == NULL) { \
-        return sil_err(S, "Invalid LAMMPS ST"); \
-    } \
-    char *cmd = sil_toastring(S, 1); \
-    if(cmd == NULL) { \
-        return sil_err(S, "lammps.%s: bad args", __func__); \
-    }
+#include <stdio.h>
+#include <string.h>
 
 #define lmp_str \
     LAMMPS *lmp = (LAMMPS *)sil_topointer(S, 1); \
@@ -18,6 +10,28 @@
     if(name == NULL) { \
         return sil_err(S, "lammps.%s: bad args", __func__); \
     }
+
+#define ck_err \
+    if(lammps_has_error(lmp->lmp)) { \
+        char err[128]; \
+        lammps_get_last_error_message(lmp->lmp, err, 128); \
+        sil_err(S, "lammps.%s: %s", __func__, err); \
+        return 0; \
+    }
+
+#define run_cmd(...) { \
+    char *_cmd; \
+    int _clen = asprintf(&_cmd, __VA_ARGS__); \
+    if(strstr(_cmd, "create_box")) lmp->initialized = 1; \
+    lammps_command(lmp->lmp, _cmd); \
+    if(!lmp->initialized) { \
+        _cmd[_clen] = '\n'; \
+        write(lmp->dat->fd, _cmd, _clen+1); \
+    } \
+    free(_cmd); \
+    ck_err; \
+    sil_settop(S, 0); }
+
 
 /* copied from library.h */
 void  lammps_close(void *);
@@ -39,23 +53,118 @@ void lammps_scatter_atoms(void *, char *, int, int, void *);
 // assumes not LAMMPS_BIGBIG
 void lammps_create_atoms(void *, int, int *, int *,
                                  double *, double *, int *, int);
-
+int lammps_has_error(void *ptr);
+int lammps_get_last_error_message(void *ptr, char * buffer, int buffer_size);
 
 // String -> ST(LAMMPS, Nil)
 int command(sil_State *S) {
-    lmp_str_st;
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    const char *cmd = sil_tobinary(S, 1, &len);
+    if(cmd == NULL) {
+        return sil_err(S, "lammps.command: bad arg");
+    }
 
-    lammps_command(lmp->lmp, cmd);
-    free(cmd);
+    run_cmd("%.*s", (int)len, cmd);
+
+    sil_pushnil(S);
+    return 0;
+}
+
+// String -> ST(LAMMPS, Int)
+int newDatum(sil_State *S) {
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    const char *buf = sil_tobinary(S, 1, &len);
+    if(buf == NULL) {
+        return sil_err(S, "newDatum: String required.", __func__);
+    }
+
+    int n = new_datum(&lmp->dat, buf, len);
+ 
+    sil_settop(S, 0);
+    sil_pushinteger(S, n);
+    return 0;
+}
+
+// Int -> ST(LAMMPS, String)
+int getDatum(sil_State *S) {
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    int n = sil_tointeger(S, 1);
+    if(n < 0) {
+        return sil_err(S, "Invalid datum n.\n");
+    }
+    char *buf = read_datum(lmp->dat, n, &len);
 
     sil_settop(S, 0);
-    /*if(lammps_has_error(lmp->lmp)) {
-        char *err = (char *)malloc(100);
-        lammps_get_last_error_message(lmp->lmp, err, 100);
-        sil_err(S, "lammps.command: %s", err);
-        free(err);
-        return 0;
-    }*/
+    sil_pushbinary(S, buf, len, 1);
+    return 0;
+}
+
+// Int -> String -> ST(LAMMPS, Bool)
+int putDatum(sil_State *S) {
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    int n = sil_tointeger(S, 1);
+    const char *buf = sil_tobinary(S, 2, &len);
+    if(n < 0 || buf == NULL) {
+        return sil_err(S, "lammps.putDatum: invalid args");
+    }
+    int ret = put_datum(lmp->dat, n, buf, len);
+
+    sil_settop(S, 0);
+    sil_pushboolean(S, !ret);
+    return 0;
+}
+
+
+// Int -> ST(LAMMPS, Nil)
+int molecule(sil_State *S) {
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    int n = sil_tointeger(S, 1);
+    LmpDatum *dat = *get_datum(&lmp->dat, n);
+    if(dat == NULL) {
+        return sil_err(S, "lammps.molecule: Invalid datum.");
+    }
+
+    run_cmd("molecule %s", dat->name);
+
+    sil_pushnil(S);
+    return 0;
+}
+
+// Int -> ST(LAMMPS, Nil)
+int read_data(sil_State *S) {
+    size_t len;
+    LAMMPS *lmp = (LAMMPS *)sil_getST(S, &len);
+    if(lmp == NULL) {
+        return sil_err(S, "Invalid LAMMPS ST");
+    }
+    int n = sil_tointeger(S, 1);
+    LmpDatum *dat = *get_datum(&lmp->dat, n);
+    if(dat == NULL) {
+        return sil_err(S, "lammps.read_data: Invalid datum.");
+    }
+
+    lmp->initialized = 1;
+    run_cmd("read_data %s", dat->name);
 
     sil_pushnil(S);
     return 0;
@@ -173,18 +282,17 @@ int get_natoms(sil_State *S) {
 
 // Int ndim -> LAMMPS
 int open(sil_State *S) {
-    char cmd[] = "dimension 3";
-    LAMMPS *lmp = open_lammps(NULL, 0);
-    if(lmp == NULL)
-        return sil_err(S, "lammps.open: initialization error");
-
     int n = sil_tointeger(S, 1);
     if(n < 1 || n > 3)
         return sil_err(S, "lammps.open: invalid dimension");
-    cmd[10] = '0'+n;
-    lammps_command(lmp->lmp, cmd);
-    
-    sil_settop(S, 0);
+
+    LAMMPS *lmp = open_lammps();
+    if(lmp == NULL)
+        return sil_err(S, "lammps.open: initialization error");
+    startup_lammps(lmp, 0);
+
+    run_cmd("dimension %d", n);
+ 
     if(sil_pushlammps(S, lmp)) {
         lammps_close(lmp->lmp);
         free(lmp);
@@ -192,3 +300,4 @@ int open(sil_State *S) {
     }
     return 0;
 }
+
