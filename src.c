@@ -91,6 +91,7 @@ int newDatum(sil_State *S) {
     }
 
     int n = new_datum(&lmp->dat, buf, len);
+    declare_datum(lmp, n);
  
     sil_settop(S, 0);
     sil_pushinteger(S, n);
@@ -146,16 +147,16 @@ int molecule(sil_State *S) {
     }
     const char *s1 = sil_tobinary(S, 1, &l1);
     int n = sil_tointeger(S, 2);
-    const char *s2 = sil_tointeger(S, 3, &l2);
+    const char *s2 = sil_tobinary(S, 3, &l2);
     if(s1 == NULL || s2 == NULL) {
         return sil_err(S, "lammps.molecule: String -> Int -> String -> ST(LAMMPS,Nil)");
     }
-    LmpDatum *dat = *get_datum(&lmp->dat, n);
+    /*LmpDatum *dat = *get_datum(&lmp->dat, n);
     if(dat == NULL) {
         return sil_err(S, "lammps.molecule: Invalid datum.");
-    }
+    }*/
 
-    run_cmd("molecule %.*s %s %.*s", (int)l1, s1, dat->name, (int)l2, s2);
+    run_cmd("molecule %.*s ${datum%03d} %.*s", (int)l1, s1, n, (int)l2, s2);
 
     sil_pushnil(S);
     return 0;
@@ -194,12 +195,12 @@ int read_data(sil_State *S) {
         return sil_err(S, "Invalid LAMMPS ST");
     }
     int n = sil_tointeger(S, 1);
-    LmpDatum *dat = *get_datum(&lmp->dat, n);
+    /*LmpDatum *dat = *get_datum(&lmp->dat, n);
     if(dat == NULL) {
         return sil_err(S, "lammps.read_data: Invalid datum.");
-    }
+    }*/
 
-    run_cmd("read_data %s", dat->name);
+    run_cmd("read_data ${datum%03d}", n);
     lmp->initialized = 1;
 
     sil_pushnil(S);
