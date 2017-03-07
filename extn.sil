@@ -4,4 +4,4 @@ molecule = 2
 read_data = 2
 newDatum = 2
 getDatum = 2
-putDatum = 2
+run = 2

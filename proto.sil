@@ -13,8 +13,8 @@ extract_compute = fun LAMMPS _, String id, Int style, Int t ->
 gather_atoms = fun LAMMPS _, String prop, Kind t, Int count -> Vector
 get_natoms = fun LAMMPS _ -> Int
 
-molecule  = fun Int -> ST(LAMMPS, Nil)
-read_data = fun Int -> ST(LAMMPS, Nil)
+molecule  = fun String name, Int n, String args -> ST(LAMMPS, Nil)
+read_data = fun Int n -> ST(LAMMPS, Nil)
 newDatum = fun String dat -> ST(LAMMPS, Int)
 getDatum = fun Int n -> ST(LAMMPS, String)
-putDatum = fun Int n, String dat -> ST(LAMMPS, Bool)
+run = fun Int n -> ST(LAMMPS, Int)
