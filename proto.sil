@@ -5,12 +5,12 @@ open = fun Int ndim -> LAMMPS
 command = fun String cmd -> ST(LAMMPS, Nil)
 -- t is Float or Int
 global  = fun LAMMPS _, String name, Kind t -> t
-extract_atom = fun LAMMPS _, String prop, Kind t -> t
 extract_compute = fun LAMMPS _, String id, Int style, Int t ->
                     If t == 0: Float
                     else:      Vector
 
 gather_atoms = fun LAMMPS _, String prop, Kind t, Int count -> Vector
+scatter_atoms = fun String prop, Kind t, Vector v -> ST(LAMMPS, Nil)
 get_natoms = fun LAMMPS _ -> Int
 
 molecule  = fun String name, Int n, String args -> ST(LAMMPS, Nil)

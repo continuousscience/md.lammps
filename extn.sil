@@ -1,6 +1,7 @@
 -- this is a pure ST function.
 command = 2
 molecule = 2
+scatter_atoms = 2
 read_data = 2
 newDatum = 2
 getDatum = 2
